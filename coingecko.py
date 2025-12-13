@@ -2,11 +2,13 @@ import os
 import json
 import requests
 from datetime import datetime, timezone
+
 from dotenv import load_dotenv  # pip install python-dotenv
-from flask import Flask,jsonify  # NEW
+from flask import Flask, jsonify  # pip install flask
+from google.cloud import bigquery  # pip install google-cloud-bigquery
 
 
-# 1. Load .env and API key
+# 1. Config and API key
 load_dotenv()
 API_KEY = os.getenv("COINGECKO_API_KEY")  # in .env: COINGECKO_API_KEY=your_demo_key
 BASE_URL = "https://api.coingecko.com/api/v3"
@@ -16,6 +18,13 @@ if not API_KEY:
     raise RuntimeError("COINGECKO_API_KEY not set in .env")
 
 headers = {"x-cg-demo-api-key": API_KEY}
+
+# GCP / BigQuery config
+PROJECT_ID = "tokyo-data-473514-h8"
+DATASET_ID = "crypto_analytics"
+TABLE_ID = "top5_markets"
+
+bq_client = bigquery.Client(project=PROJECT_ID)
 
 # 2. Fields you care about from /coins/markets
 FIELDS = [
@@ -31,7 +40,9 @@ FIELDS = [
     "roi", "last_updated",
 ]
 
+
 def fetch_top5_markets():
+    """Fetch top 5 coins by market cap with full market data."""
     url = f"{BASE_URL}/coins/markets"
     params = {
         "vs_currency": VS_CURRENCY,
@@ -55,9 +66,22 @@ def fetch_top5_markets():
 
     return cleaned
 
+
+def write_to_bigquery(rows):
+    """Insert list of dicts into BigQuery."""
+    table_id = f"{PROJECT_ID}.{DATASET_ID}.{TABLE_ID}"
+    errors = bq_client.insert_rows_json(table_id, rows)
+    if errors:
+        # Log errors for debugging (visible in Cloud Run logs)
+        print(f"BigQuery insert errors: {errors}")
+        raise RuntimeError(f"BigQuery insert errors: {errors}")
+
+
 def main():
     top5 = fetch_top5_markets()
+    write_to_bigquery(top5)
 
+    # Logs for debugging (will show in Cloud Run logs)
     print("\n=== FULL JSON (cleaned fields only) ===\n")
     print(json.dumps(top5, indent=2))
 
@@ -71,14 +95,20 @@ def main():
             f"{c['price_change_percentage_24h']}"
         )
 
-# ---- NEW: HTTP entrypoint for Cloud Run ----
+    return top5
+
+
+# ---- HTTP entrypoint for Cloud Run ----
 app = Flask(__name__)
+
 
 @app.route("/", methods=["GET"])
 def trigger():
-    top5 = fetch_top5_markets()
+    top5 = main()
+    # Show data in browser/preview
     return jsonify(top5), 200
 
+
 if __name__ == "__main__":
-    # local dev
+    # Local dev
     app.run(host="0.0.0.0", port=8080)
