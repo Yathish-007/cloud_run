@@ -61,7 +61,11 @@ def fetch_top5_markets():
     for coin in data:
         record = {"snapshot_time": snapshot_time}
         for field in FIELDS:
-            record[field] = coin.get(field)
+            value = coin.get(field)
+            # Flatten roi dict to JSON string so it fits STRING column
+            if field == "roi" and isinstance(value, dict):
+                value = json.dumps(value)
+            record[field] = value
         cleaned.append(record)
 
     return cleaned
