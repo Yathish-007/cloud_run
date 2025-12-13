@@ -3,7 +3,8 @@ import json
 import requests
 from datetime import datetime, timezone
 from dotenv import load_dotenv  # pip install python-dotenv
-from flask import Flask  # NEW
+from flask import Flask,jsonify  # NEW
+
 
 # 1. Load .env and API key
 load_dotenv()
