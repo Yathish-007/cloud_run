@@ -75,8 +75,8 @@ app = Flask(__name__)
 
 @app.route("/", methods=["GET"])
 def trigger():
-    main()
-    return "OK", 200
+    top5 = fetch_top5_markets()
+    return jsonify(top5), 200
 
 if __name__ == "__main__":
     # local dev
