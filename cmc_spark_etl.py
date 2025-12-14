@@ -61,7 +61,7 @@ def fetch_listings_latest(limit: int = 200, convert: str = "USD") -> List[Dict[s
             "total_supply": item.get("total_supply"),
             "max_supply": item.get("max_supply"),
             "num_market_pairs": item.get("num_market_pairs"),
-            "date_added": item.get("date_added"),
+            "date_added": item.get("date_added"),           # keep as string
             "tags": json.dumps(item.get("tags", [])),
             "price": quote.get("price"),
             "volume_24h": quote.get("volume_24h"),
@@ -108,7 +108,7 @@ def main():
     print("DEBUG: CMC schema after json read:")
     df.printSchema()
 
-    # Cast types to match cmc_listings_latest schema
+    # Cast types to match cmc_listings_latest BigQuery schema
     df = (
         df
         .withColumn("cmc_id",            col("cmc_id").cast("long"))     # INTEGER
@@ -123,8 +123,8 @@ def main():
         .withColumn("percent_change_24h", col("percent_change_24h").cast("double"))
         .withColumn("percent_change_7d",  col("percent_change_7d").cast("double"))
         .withColumn("market_cap",         col("market_cap").cast("double"))
+        # date_added stays STRING to match BigQuery column type
         .withColumn("snapshot_time", to_timestamp("snapshot_time"))
-        .withColumn("date_added",    to_timestamp("date_added"))
         .withColumn("last_updated",  to_timestamp("last_updated"))
     )
 
