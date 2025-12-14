@@ -1,8 +1,8 @@
 # app.py
 from flask import Flask, jsonify
 
-from gecko_loader import main as gecko_main
-from cmc_loader import main as cmc_main
+from coingecko import main as gecko_main
+from blockchain_explorer import main as cmc_main
 
 app = Flask(__name__)
 
