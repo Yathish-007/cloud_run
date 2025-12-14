@@ -3,7 +3,6 @@ import subprocess
 from flask import Flask, jsonify
 from dotenv import load_dotenv
 
-# Load .env once at startup
 load_dotenv()
 
 app = Flask(__name__)

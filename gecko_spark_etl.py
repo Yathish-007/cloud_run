@@ -1,5 +1,6 @@
 # gecko_spark_etl.py
 import os
+import sys
 import json
 import requests
 from datetime import datetime, timezone
@@ -9,6 +10,9 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, to_timestamp
 
 print("DEBUG: gecko_spark_etl.py starting")
+print("DEBUG: sys.executable =", sys.executable)
+print("DEBUG: PYSPARK_PYTHON =", os.getenv("PYSPARK_PYTHON"))
+print("DEBUG: PYSPARK_DRIVER_PYTHON =", os.getenv("PYSPARK_DRIVER_PYTHON"))
 
 load_dotenv()
 print("DEBUG: after load_dotenv, COINGECKO_API_KEY present =", "COINGECKO_API_KEY" in os.environ)
@@ -101,19 +105,19 @@ def main():
     print("DEBUG: schema after json read:")
     df.printSchema()
 
-    # Cast types to match BigQuery schema
+    # Cast types to match BigQuery schema (FLOAT, INTEGER, STRING, TIMESTAMP)
     df = (
         df
-        .withColumn("current_price",  col("current_price").cast("double"))   # FLOAT
-        .withColumn("market_cap",     col("market_cap").cast("long"))        # INTEGER
-        .withColumn("market_cap_rank", col("market_cap_rank").cast("long"))  # INTEGER
+        .withColumn("current_price",  col("current_price").cast("double"))
+        .withColumn("market_cap",     col("market_cap").cast("long"))
+        .withColumn("market_cap_rank", col("market_cap_rank").cast("long"))
         .withColumn("fully_diluted_valuation", col("fully_diluted_valuation").cast("long"))
         .withColumn("total_volume",   col("total_volume").cast("long"))
         .withColumn("high_24h",       col("high_24h").cast("double"))
         .withColumn("low_24h",        col("low_24h").cast("double"))
-        .withColumn("price_change_24h",           col("price_change_24h").cast("double"))
-        .withColumn("price_change_percentage_24h", col("price_change_percentage_24h").cast("double"))
-        .withColumn("market_cap_change_24h",           col("market_cap_change_24h").cast("double"))
+        .withColumn("price_change_24h",             col("price_change_24h").cast("double"))
+        .withColumn("price_change_percentage_24h",  col("price_change_percentage_24h").cast("double"))
+        .withColumn("market_cap_change_24h",        col("market_cap_change_24h").cast("double"))
         .withColumn("market_cap_change_percentage_24h", col("market_cap_change_percentage_24h").cast("double"))
         .withColumn("circulating_supply", col("circulating_supply").cast("double"))
         .withColumn("total_supply",       col("total_supply").cast("double"))
@@ -122,7 +126,6 @@ def main():
         .withColumn("ath_change_percentage", col("ath_change_percentage").cast("double"))
         .withColumn("atl",                col("atl").cast("double"))
         .withColumn("atl_change_percentage", col("atl_change_percentage").cast("double"))
-        # Timestamps: parse ISO strings into TIMESTAMP
         .withColumn("snapshot_time", to_timestamp("snapshot_time"))
         .withColumn("ath_date",      to_timestamp("ath_date"))
         .withColumn("atl_date",      to_timestamp("atl_date"))
