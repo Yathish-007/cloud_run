@@ -6,11 +6,10 @@ from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import lit
+from pyspark.sql.functions import col, to_timestamp
 
 print("DEBUG: gecko_spark_etl.py starting")
 
-# Load .env so COINGECKO_API_KEY is available
 load_dotenv()
 print("DEBUG: after load_dotenv, COINGECKO_API_KEY present =", "COINGECKO_API_KEY" in os.environ)
 
@@ -22,7 +21,6 @@ VS_CURRENCY = "usd"
 API_KEY = os.getenv("COINGECKO_API_KEY")
 if not API_KEY:
     raise RuntimeError("COINGECKO_API_KEY not set in environment")
-
 print("DEBUG: COINGECKO_API_KEY length =", len(API_KEY))
 
 BASE_URL = "https://api.coingecko.com/api/v3"
@@ -80,7 +78,7 @@ def main():
     )
     print("DEBUG: Spark version =", spark.version)
 
-    # GCS filesystem config (for temp bucket) – Spark 3.5 style
+    # GCS filesystem config
     print("DEBUG: setting GCS Hadoop configuration via spark._jsc.hadoopConfiguration()")
     hadoop_conf = spark._jsc.hadoopConfiguration()
     hadoop_conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
@@ -100,13 +98,42 @@ def main():
     print("DEBUG: reading JSON into DataFrame")
     df = spark.read.json(rdd)
 
-    row_count = df.count()
-    print("DEBUG: dataframe row count before load_date =", row_count)
-    print("DEBUG: dataframe schema:")
+    print("DEBUG: schema after json read:")
     df.printSchema()
 
-    df = df.withColumn("load_date", lit(datetime.now().date().isoformat()))
-    print("DEBUG: added load_date column")
+    # Cast types to match BigQuery schema
+    df = (
+        df
+        .withColumn("current_price",  col("current_price").cast("double"))   # FLOAT
+        .withColumn("market_cap",     col("market_cap").cast("long"))        # INTEGER
+        .withColumn("market_cap_rank", col("market_cap_rank").cast("long"))  # INTEGER
+        .withColumn("fully_diluted_valuation", col("fully_diluted_valuation").cast("long"))
+        .withColumn("total_volume",   col("total_volume").cast("long"))
+        .withColumn("high_24h",       col("high_24h").cast("double"))
+        .withColumn("low_24h",        col("low_24h").cast("double"))
+        .withColumn("price_change_24h",           col("price_change_24h").cast("double"))
+        .withColumn("price_change_percentage_24h", col("price_change_percentage_24h").cast("double"))
+        .withColumn("market_cap_change_24h",           col("market_cap_change_24h").cast("double"))
+        .withColumn("market_cap_change_percentage_24h", col("market_cap_change_percentage_24h").cast("double"))
+        .withColumn("circulating_supply", col("circulating_supply").cast("double"))
+        .withColumn("total_supply",       col("total_supply").cast("double"))
+        .withColumn("max_supply",         col("max_supply").cast("double"))
+        .withColumn("ath",                col("ath").cast("double"))
+        .withColumn("ath_change_percentage", col("ath_change_percentage").cast("double"))
+        .withColumn("atl",                col("atl").cast("double"))
+        .withColumn("atl_change_percentage", col("atl_change_percentage").cast("double"))
+        # Timestamps: parse ISO strings into TIMESTAMP
+        .withColumn("snapshot_time", to_timestamp("snapshot_time"))
+        .withColumn("ath_date",      to_timestamp("ath_date"))
+        .withColumn("atl_date",      to_timestamp("atl_date"))
+        .withColumn("last_updated",  to_timestamp("last_updated"))
+    )
+
+    print("DEBUG: schema after casts:")
+    df.printSchema()
+
+    row_count = df.count()
+    print("DEBUG: final dataframe row count =", row_count)
 
     target_table = f"{PROJECT_ID}.{DATASET}.{TABLE}"
     print("DEBUG: writing to BigQuery table", target_table)
