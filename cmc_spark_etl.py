@@ -1,14 +1,16 @@
-# cmc_loader.py
+# cmc_spark_etl.py
 import os
 import json
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
 import requests
-from dotenv import load_dotenv
-from google.cloud import bigquery
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import lit
 
-load_dotenv()
+PROJECT_ID = "tokyo-data-473514-h8"
+DATASET = "crypto_analytics"
+TABLE = "cmc_listings_latest"
 
 CMC_API_KEY = os.getenv("CMC_API_KEY")
 if not CMC_API_KEY:
@@ -21,19 +23,11 @@ HEADERS_CMC = {
     "Accept": "application/json",
 }
 
-PROJECT_ID = "tokyo-data-473514-h8"
-DATASET_ID = "crypto_analytics"
-LISTINGS_TABLE_ID = "cmc_listings_latest"
-
-bq_client = bigquery.Client(project=PROJECT_ID)
-
-
 def _cmc_get(path: str, params: Optional[Dict[str, Any]] = None) -> Any:
     url = f"{BASE_URL_CMC}{path}"
     resp = requests.get(url, headers=HEADERS_CMC, params=params, timeout=30)
     resp.raise_for_status()
     return resp.json()
-
 
 def fetch_listings_latest(limit: int = 200, convert: str = "USD") -> List[Dict[str, Any]]:
     params = {"start": 1, "limit": limit, "convert": convert}
@@ -67,20 +61,32 @@ def fetch_listings_latest(limit: int = 200, convert: str = "USD") -> List[Dict[s
         cleaned.append(record)
     return cleaned
 
+def main():
+    spark = (
+        SparkSession.builder
+        .appName("cmc_spark_to_bigquery")
+        .getOrCreate()
+    )
 
-def write_to_bigquery(rows: List[Dict[str, Any]]):
-    table_id = f"{PROJECT_ID}.{DATASET_ID}.{LISTINGS_TABLE_ID}"
-    errors = bq_client.insert_rows_json(table_id, rows)
-    if errors:
-        print(f"BigQuery insert errors (cmc): {errors}")
-        raise RuntimeError(f"BigQuery insert errors (cmc): {errors}")
+    spark.conf.set("temporaryGcsBucket", "spark-bq-staging-eu")
 
+    records = fetch_listings_latest(limit=200)
 
-def main(limit: int = 200) -> List[Dict[str, Any]]:
-    listings = fetch_listings_latest(limit=limit)
-    write_to_bigquery(listings)
+    df = spark.read.json(
+        spark.sparkContext.parallelize([json.dumps(r) for r in records])
+    )
 
-    print(f"\n=== CMC: inserted {len(listings)} listings rows ===")
-    print(json.dumps(listings[:3], indent=2))
+    df = df.withColumn("load_date", lit(datetime.now().date().isoformat()))
 
-    return listings
+    (
+        df.write
+          .format("bigquery")
+          .mode("append")
+          .option("writeMethod", "indirect")
+          .save(f"{PROJECT_ID}.{DATASET}.{TABLE}")
+    )
+
+    spark.stop()
+
+if __name__ == "__main__":
+    main()

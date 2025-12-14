@@ -1,4 +1,6 @@
-flask
+Flask
 requests
-python-dotenv
+pyspark
 google-cloud-bigquery
+python-dotenv
+gunicorn
