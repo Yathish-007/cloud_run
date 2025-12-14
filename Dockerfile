@@ -17,13 +17,13 @@ RUN curl -L https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-$
 ENV SPARK_HOME=/opt/spark
 ENV PATH="${SPARK_HOME}/bin:${PATH}"
 
-# Ensure Spark's Python libs are visible
+# Make Spark's Python libs visible to Python
 ENV PYTHONPATH="${SPARK_HOME}/python:${SPARK_HOME}/python/lib/py4j-0.10.9.7-src.zip"
 
 # BigQuery connector JAR
 ADD https://storage.googleapis.com/spark-lib/bigquery/spark-bigquery-with-dependencies_2.12-0.38.0.jar /opt/spark/jars/
 
-# GCS connector JAR for Hadoop 3 (needed for GoogleHadoopFileSystem)
+# GCS connector JAR for Hadoop 3
 ADD https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-hadoop3-latest.jar /opt/spark/jars/
 
 # Copy project (includes .env)

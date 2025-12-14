@@ -78,6 +78,8 @@ def main():
     spark = (
         SparkSession.builder
         .appName("gecko_spark_to_bigquery")
+        .master("local[1]")                     # force single local worker
+        .config("spark.python.worker.reuse", "false")
         .getOrCreate()
     )
     print("DEBUG: Spark version =", spark.version)
@@ -105,7 +107,7 @@ def main():
     print("DEBUG: schema after json read:")
     df.printSchema()
 
-    # Cast types to match BigQuery schema (FLOAT, INTEGER, STRING, TIMESTAMP)
+    # Cast types to match BigQuery schema (only FLOAT, INTEGER, STRING, TIMESTAMP)
     df = (
         df
         .withColumn("current_price",  col("current_price").cast("double"))
