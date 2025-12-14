@@ -32,6 +32,7 @@ FIELDS = [
     "roi", "last_updated",
 ]
 
+
 def fetch_top5_markets():
     url = f"{BASE_URL}/coins/markets"
     params = {
@@ -58,6 +59,7 @@ def fetch_top5_markets():
         cleaned.append(rec)
     return cleaned
 
+
 def main():
     spark = (
         SparkSession.builder
@@ -65,7 +67,13 @@ def main():
         .getOrCreate()
     )
 
-    # must exist and be writable by the service account
+    # Configure GCS filesystem for Spark
+    conf = spark.sparkContext.hadoopConfiguration
+    conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
+    conf.set("fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
+    conf.set("google.cloud.auth.service.account.enable", "true")
+
+    # Temp bucket for Spark BigQuery connector
     spark.conf.set("temporaryGcsBucket", "spark-bq-staging-eu")
 
     records = fetch_top5_markets()
@@ -74,7 +82,6 @@ def main():
         spark.sparkContext.parallelize([json.dumps(r) for r in records])
     )
 
-    # example extra column
     df = df.withColumn("load_date", lit(datetime.now().date().isoformat()))
 
     (
@@ -86,6 +93,7 @@ def main():
     )
 
     spark.stop()
+
 
 if __name__ == "__main__":
     main()
