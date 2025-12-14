@@ -1,6 +1,5 @@
 FROM python:3.11-slim
 
-# Set working directory
 WORKDIR /app
 
 # Copy all project files (including .env) into the image
@@ -13,5 +12,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 ENV PORT=8080
 EXPOSE 8080
 
-# Start your Flask app
-CMD ["python", "coingecko.py"]
+# Start the combined Flask app (CoinGecko + CMC routes)
+CMD ["python", "app.py"]
