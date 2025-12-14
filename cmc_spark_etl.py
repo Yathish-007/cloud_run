@@ -61,7 +61,7 @@ def fetch_listings_latest(limit: int = 200, convert: str = "USD") -> List[Dict[s
             "total_supply": item.get("total_supply"),
             "max_supply": item.get("max_supply"),
             "num_market_pairs": item.get("num_market_pairs"),
-            "date_added": item.get("date_added"),           # keep as string
+            "date_added": item.get("date_added"),           # STRING in BQ
             "tags": json.dumps(item.get("tags", [])),
             "price": quote.get("price"),
             "volume_24h": quote.get("volume_24h"),
@@ -69,7 +69,7 @@ def fetch_listings_latest(limit: int = 200, convert: str = "USD") -> List[Dict[s
             "percent_change_24h": quote.get("percent_change_24h"),
             "percent_change_7d": quote.get("percent_change_7d"),
             "market_cap": quote.get("market_cap"),
-            "last_updated": quote.get("last_updated"),
+            "last_updated": quote.get("last_updated"),     # STRING in BQ
         }
         cleaned.append(record)
     print("DEBUG: fetched CMC records count =", len(cleaned))
@@ -123,9 +123,8 @@ def main():
         .withColumn("percent_change_24h", col("percent_change_24h").cast("double"))
         .withColumn("percent_change_7d",  col("percent_change_7d").cast("double"))
         .withColumn("market_cap",         col("market_cap").cast("double"))
-        # date_added stays STRING to match BigQuery column type
-        .withColumn("snapshot_time", to_timestamp("snapshot_time"))
-        .withColumn("last_updated",  to_timestamp("last_updated"))
+        # date_added and last_updated remain STRING
+        .withColumn("snapshot_time", to_timestamp("snapshot_time"))      # TIMESTAMP in BQ
     )
 
     print("DEBUG: CMC schema after casts:")
