@@ -4,8 +4,12 @@ import json
 import requests
 from datetime import datetime, timezone
 
+from dotenv import load_dotenv
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit
+
+# Load .env so COINGECKO_API_KEY is available
+load_dotenv()
 
 PROJECT_ID = "tokyo-data-473514-h8"
 DATASET = "crypto_analytics"
@@ -31,7 +35,6 @@ FIELDS = [
     "atl", "atl_change_percentage", "atl_date",
     "roi", "last_updated",
 ]
-
 
 def fetch_top5_markets():
     url = f"{BASE_URL}/coins/markets"
@@ -59,7 +62,6 @@ def fetch_top5_markets():
         cleaned.append(rec)
     return cleaned
 
-
 def main():
     spark = (
         SparkSession.builder
@@ -67,13 +69,12 @@ def main():
         .getOrCreate()
     )
 
-    # Configure GCS filesystem for Spark
+    # GCS filesystem config (for temp bucket)
     conf = spark.sparkContext.hadoopConfiguration
     conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
     conf.set("fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
     conf.set("google.cloud.auth.service.account.enable", "true")
 
-    # Temp bucket for Spark BigQuery connector
     spark.conf.set("temporaryGcsBucket", "spark-bq-staging-eu")
 
     records = fetch_top5_markets()
@@ -93,7 +94,6 @@ def main():
     )
 
     spark.stop()
-
 
 if __name__ == "__main__":
     main()

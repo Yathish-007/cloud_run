@@ -1,6 +1,10 @@
 # app.py
 import subprocess
 from flask import Flask, jsonify
+from dotenv import load_dotenv
+
+# Load variables from .env into os.environ
+load_dotenv()
 
 app = Flask(__name__)
 
