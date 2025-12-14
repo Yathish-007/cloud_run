@@ -3,7 +3,7 @@ import subprocess
 from flask import Flask, jsonify
 from dotenv import load_dotenv
 
-# Load variables from .env into os.environ
+# Load .env once at startup
 load_dotenv()
 
 app = Flask(__name__)
@@ -13,11 +13,15 @@ def run_gecko_spark():
     result = subprocess.run(
         ["spark-submit", "/app/gecko_spark_etl.py"],
         capture_output=True,
-        text=True,
+        text=True,  # same as universal_newlines=True
     )
-    if result.returncode != 0:
-        return {"status": "error", "stderr": result.stderr}, 500
-    return {"status": "ok", "stdout": result.stdout}, 200
+    return jsonify(
+        {
+            "returncode": result.returncode,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
+    ), (200 if result.returncode == 0 else 500)
 
 @app.route("/cmc", methods=["GET"])
 def run_cmc_spark():
@@ -26,13 +30,17 @@ def run_cmc_spark():
         capture_output=True,
         text=True,
     )
-    if result.returncode != 0:
-        return {"status": "error", "stderr": result.stderr}, 500
-    return {"status": "ok", "stdout": result.stdout}, 200
+    return jsonify(
+        {
+            "returncode": result.returncode,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
+    ), (200 if result.returncode == 0 else 500)
 
 @app.route("/", methods=["GET"])
 def health():
-    return {"status": "ok", "services": ["gecko_spark", "cmc_spark"]}, 200
+    return {"status": "ok", "services": ["gecko", "cmc"]}, 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)

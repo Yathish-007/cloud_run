@@ -8,10 +8,11 @@ from dotenv import load_dotenv
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit
 
-print("DEBUG: starting gecko_spark_etl.py")
+print("DEBUG: gecko_spark_etl.py starting")
 
+# Load .env so COINGECKO_API_KEY is available
 load_dotenv()
-print("DEBUG: after load_dotenv, COINGECKO_API_KEY =", os.getenv("COINGECKO_API_KEY"))
+print("DEBUG: after load_dotenv, COINGECKO_API_KEY present =", "COINGECKO_API_KEY" in os.environ)
 
 PROJECT_ID = "tokyo-data-473514-h8"
 DATASET = "crypto_analytics"
@@ -21,6 +22,8 @@ VS_CURRENCY = "usd"
 API_KEY = os.getenv("COINGECKO_API_KEY")
 if not API_KEY:
     raise RuntimeError("COINGECKO_API_KEY not set in environment")
+
+print("DEBUG: COINGECKO_API_KEY length =", len(API_KEY))
 
 BASE_URL = "https://api.coingecko.com/api/v3"
 HEADERS = {"x-cg-demo-api-key": API_KEY}
@@ -39,7 +42,7 @@ FIELDS = [
 ]
 
 def fetch_top5_markets():
-    print("DEBUG: calling CoinGecko")
+    print("DEBUG: calling CoinGecko /coins/markets")
     url = f"{BASE_URL}/coins/markets"
     params = {
         "vs_currency": VS_CURRENCY,
@@ -49,7 +52,8 @@ def fetch_top5_markets():
         "sparkline": "false",
     }
     r = requests.get(url, headers=HEADERS, params=params, timeout=15)
-    print("DEBUG: CoinGecko status", r.status_code, r.text[:200])
+    print("DEBUG: CoinGecko status", r.status_code)
+    print("DEBUG: CoinGecko body snippet:", r.text[:200])
     r.raise_for_status()
     data = r.json()
 
@@ -75,27 +79,26 @@ def main():
         .getOrCreate()
     )
 
+    # GCS filesystem config (for temp bucket)
     conf = spark.sparkContext.hadoopConfiguration
     conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
     conf.set("fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
     conf.set("google.cloud.auth.service.account.enable", "true")
 
     spark.conf.set("temporaryGcsBucket", "spark-bq-staging-eu")
-    print("DEBUG: set temporaryGcsBucket")
+    print("DEBUG: set temporaryGcsBucket to spark-bq-staging-eu")
 
     records = fetch_top5_markets()
 
-    from pyspark import SparkContext
-    sc = SparkContext.getOrCreate()
     print("DEBUG: parallelizing records")
-    rdd = sc.parallelize([json.dumps(r) for r in records])
+    rdd = spark.sparkContext.parallelize([json.dumps(r) for r in records])
 
     df = spark.read.json(rdd)
-    print("DEBUG: dataframe rows =", df.count())
+    print("DEBUG: dataframe count before load_date =", df.count())
 
     df = df.withColumn("load_date", lit(datetime.now().date().isoformat()))
-    print("DEBUG: writing to BigQuery")
 
+    print("DEBUG: writing to BigQuery table", f"{PROJECT_ID}.{DATASET}.{TABLE}")
     (
         df.write
           .format("bigquery")
