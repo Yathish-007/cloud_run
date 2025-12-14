@@ -78,37 +78,50 @@ def main():
         .appName("gecko_spark_to_bigquery")
         .getOrCreate()
     )
+    print("DEBUG: Spark version =", spark.version)
 
-    # GCS filesystem config (for temp bucket)
-    conf = spark.sparkContext.hadoopConfiguration
-    conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
-    conf.set("fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
-    conf.set("google.cloud.auth.service.account.enable", "true")
+    # GCS filesystem config (for temp bucket) – Spark 3.5 style
+    print("DEBUG: setting GCS Hadoop configuration via spark._jsc.hadoopConfiguration()")
+    hadoop_conf = spark._jsc.hadoopConfiguration()
+    hadoop_conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
+    hadoop_conf.set("fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
+    hadoop_conf.set("google.cloud.auth.service.account.enable", "true")
+    print("DEBUG: GCS Hadoop configuration set")
 
     spark.conf.set("temporaryGcsBucket", "spark-bq-staging-eu")
     print("DEBUG: set temporaryGcsBucket to spark-bq-staging-eu")
 
+    print("DEBUG: fetching records from CoinGecko")
     records = fetch_top5_markets()
 
-    print("DEBUG: parallelizing records")
+    print("DEBUG: parallelizing records, count =", len(records))
     rdd = spark.sparkContext.parallelize([json.dumps(r) for r in records])
 
+    print("DEBUG: reading JSON into DataFrame")
     df = spark.read.json(rdd)
-    print("DEBUG: dataframe count before load_date =", df.count())
+
+    row_count = df.count()
+    print("DEBUG: dataframe row count before load_date =", row_count)
+    print("DEBUG: dataframe schema:")
+    df.printSchema()
 
     df = df.withColumn("load_date", lit(datetime.now().date().isoformat()))
+    print("DEBUG: added load_date column")
 
-    print("DEBUG: writing to BigQuery table", f"{PROJECT_ID}.{DATASET}.{TABLE}")
+    target_table = f"{PROJECT_ID}.{DATASET}.{TABLE}"
+    print("DEBUG: writing to BigQuery table", target_table)
+
     (
         df.write
           .format("bigquery")
           .mode("append")
           .option("writeMethod", "indirect")
-          .save(f"{PROJECT_ID}.{DATASET}.{TABLE}")
+          .save(target_table)
     )
 
-    print("DEBUG: finished write, stopping Spark")
+    print("DEBUG: finished BigQuery write, stopping Spark")
     spark.stop()
+    print("DEBUG: Spark stopped, exiting script")
 
 if __name__ == "__main__":
     main()
