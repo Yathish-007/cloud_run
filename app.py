@@ -13,7 +13,7 @@ def run_gecko_spark():
     result = subprocess.run(
         ["spark-submit", "/app/gecko_spark_etl.py"],
         capture_output=True,
-        text=True,  # same as universal_newlines=True
+        text=True,
     )
     return jsonify(
         {

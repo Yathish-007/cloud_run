@@ -19,7 +19,10 @@ ENV PATH="/opt/spark/bin:${PATH}"
 # BigQuery connector JAR
 ADD https://storage.googleapis.com/spark-lib/bigquery/spark-bigquery-with-dependencies_2.12-0.38.0.jar /opt/spark/jars/
 
-# Copy project
+# GCS connector JAR for Hadoop 3 (needed for GoogleHadoopFileSystem)
+ADD https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-hadoop3-latest.jar /opt/spark/jars/
+
+# Copy project (includes .env)
 COPY . /app
 
 # Python deps
